@@ -1,0 +1,35 @@
+name: VeloGrad CI/CD Pipeline
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  rust-check-and-test:
+    name: Rust Core Build & Invariant Tests
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Cargo Build Release
+        run: cargo build --release --verbose
+      - name: Run Core Verification Tests
+        run: cargo test --release --verbose
+
+  python-packaging:
+    name: Build Python Wheels via Maturin
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install Maturin
+        run: pip install maturin
+      - name: Build Wheel
+        run: maturin build --release

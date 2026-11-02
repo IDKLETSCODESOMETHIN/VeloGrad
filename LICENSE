@@ -1,0 +1,39 @@
+GNU AFFERO GENERAL PUBLIC LICENSE
+Version 3, 19 November 2007
+
+Copyright (C) 2026 VeloGrad Architecture & Systems Core Team
+
+================================================================================
+VELOGRAD DUAL-LICENSING & COMMERCIAL ROYALTY WAIVER NOTICE
+================================================================================
+
+This software is dual-licensed:
+
+1. OPEN-SOURCE NETWORK RECIPROCAL LICENSE (AGPLv3):
+   You may redistribute and/or modify this software under the terms of the GNU
+   Affero General Public License as published by the Free Software Foundation,
+   either version 3 of the License, or (at your option) any later version.
+
+   IMPORTANT NOTICE UNDER AGPLv3 SECTION 13:
+   If you modify this Program, your modified version must prominently offer all
+   users interacting with it remotely through a computer network (if your
+   version supports such interaction) an opportunity to receive the Corresponding
+   Source of your version by providing access to the Corresponding Source from a
+   network server at no charge, through some standard or customary means of
+   facilitating copying of software.
+
+2. COMMERCIAL ROYALTY WAIVER & ENTERPRISE LICENSE:
+   Organizations operating commercial SaaS platforms, proprietary cloud
+   inference networks, or enterprise model training pipelines who wish to be
+   exempt from AGPLv3 source code disclosure requirements must execute a VeloGrad
+   Commercial Royalty License Agreement. 
+
+   The Commercial Royalty Agreement grants proprietary rights in exchange for
+   a negotiated royalty percentage on infrastructure compute savings or revenue
+   generated from models deployed using the VeloGrad runtime engine.
+
+================================================================================
+                       GNU AFFERO GENERAL PUBLIC LICENSE
+================================================================================
+
+[Full standard terms of the GNU Affero General Public License Version 3 apply.]

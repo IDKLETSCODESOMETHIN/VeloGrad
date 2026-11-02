@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "velograd"
+version = "5.0.0"
+description = "VeloGrad: Pure Compiled, Bare-Metal High-Performance Machine Learning Core Engine"
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "AGPL-3.0-only" }
+authors = [
+    { name = "VeloGrad Architecture Core Team" }
+]
+classifiers = [
+    "Programming Language :: Rust",
+    "Programming Language :: C++",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "License :: OSI Approved :: GNU Affero General Public License v3"
+]
+dependencies = []
+
+[project.scripts]
+velograd = "velograd.cli:main"
+velograd-convert = "velograd.converter:main"
+velograd-studio = "velograd.studio:run_studio_server"
+
+[tool.maturin]
+features = ["python"]
+module-name = "velograd.velograd"
+python-source = "python"
