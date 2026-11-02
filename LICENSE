@@ -1,13 +1,20 @@
+# =================================================================================================
+# PROJECT: VeloGrad Engine Core (Bare-Metal Neural Compute Framework)
+# AUTHOR: Ayushman Singh Rathore
+# COPYRIGHT (C) 2026 Ayushman Singh Rathore. All Rights Reserved.
+# DUAL-LICENSED: AGPLv3 (Open-Source) + Commercial Enterprise Royalty Waiver
+# =================================================================================================
+
 GNU AFFERO GENERAL PUBLIC LICENSE
 Version 3, 19 November 2007
 
-Copyright (C) 2026 VeloGrad Architecture & Systems Core Team
+Copyright (C) 2026 Ayushman Singh Rathore
 
 ================================================================================
 VELOGRAD DUAL-LICENSING & COMMERCIAL ROYALTY WAIVER NOTICE
 ================================================================================
 
-This software is dual-licensed:
+This software is dual-licensed by the sole copyright holder, Ayushman Singh Rathore:
 
 1. OPEN-SOURCE NETWORK RECIPROCAL LICENSE (AGPLv3):
    You may redistribute and/or modify this software under the terms of the GNU
@@ -26,11 +33,13 @@ This software is dual-licensed:
    Organizations operating commercial SaaS platforms, proprietary cloud
    inference networks, or enterprise model training pipelines who wish to be
    exempt from AGPLv3 source code disclosure requirements must execute a VeloGrad
-   Commercial Royalty License Agreement. 
+   Commercial Royalty License Agreement directly with Ayushman Singh Rathore.
 
    The Commercial Royalty Agreement grants proprietary rights in exchange for
    a negotiated royalty percentage on infrastructure compute savings or revenue
    generated from models deployed using the VeloGrad runtime engine.
+
+   Contact for Enterprise Licensing: legal@velograd.ai / licensing inquiries
 
 ================================================================================
                        GNU AFFERO GENERAL PUBLIC LICENSE

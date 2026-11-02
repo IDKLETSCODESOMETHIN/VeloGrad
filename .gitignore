@@ -1,0 +1,47 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyd
+
+# C / C++ / Rust Build Artifacts
+target/
+build/
+*.o
+*.obj
+*.so
+*.dylib
+*.dll
+*.exe
+*.out
+
+# Distribution / packaging
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+dist/
+eggs/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# IDE and Editor Cache
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Checkpoints and Big Weights Cache
+checkpoints/*.safetensors
+checkpoints/*.bin
+checkpoints/*.pt
+checkpoints/*.pth
+checkpoints/*.gguf
+checkpoints/*.onnx
+!checkpoints/model_final.json

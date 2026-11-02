@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.8"
 license = { text = "AGPL-3.0-only" }
 authors = [
-    { name = "VeloGrad Architecture Core Team" }
+    { name = "Ayushman Singh Rathore" }
 ]
 classifiers = [
     "Programming Language :: Rust",

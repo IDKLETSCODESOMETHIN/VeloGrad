@@ -5,7 +5,7 @@
 [![Version: 5.0.0](https://img.shields.io/badge/Release-5.0.0--Enterprise--Production-green.svg)](#release-milestone)
 [![Ecosystem Parity: 2010 to Present](https://img.shields.io/badge/Compatibility-NumPy%20%7C%20PyTorch%20%7C%20JAX%20%7C%20GGUF%20%7C%20HF-blueviolet.svg)](#universal-ecosystem-compatibility)
 
-**VeloGrad** is a bare-metal, native-first, pure-compiled deep learning and autoregressive inference engine engineered from scratch in **C++20, Rust, CUDA/PTX, and Python**.
+**VeloGrad** is a bare-metal, native-first, pure-compiled deep learning and autoregressive inference engine engineered from scratch in **C++20, Rust, CUDA/PTX, and Python** by **Ayushman Singh Rathore**.
 
 It eliminates the bloated Python runtime overhead, PyTorch LibTorch memory fragmentation, and garbage collection (GC) stalls, replacing them with a cache-line aligned static arena allocator, radical Ahead-of-Time (AOT) kernel fusion, zero-overhead asynchronous GDS checkpointing, and 5D distributed parallelism (TP, PP, DP, EP, CP) capable of scaling from local consumer GPUs up to multi-thousand GPU datacenter clusters.
 
