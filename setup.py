@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="velograd",
-    version="5.0.0",
+    version="1.0.0",
     author="Ayushman Singh Rathore",
     description="VeloGrad: Pure Compiled, Bare-Metal High-Performance Machine Learning Core Engine",
     package_dir={"": "python"},

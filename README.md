@@ -1,8 +1,8 @@
-# VeloGrad Engine v5.0 (Enterprise Production Hardened)
+# VeloGrad Engine v1.0 (Enterprise Production Release)
 
 [![License: AGPLv3](https://img.shields.io/badge/License-AGPLv3%20%2B%20Commercial%20Waiver-blue.svg)](LICENSE)
 [![Architecture: C++20 / Rust / CUDA / Python](https://img.shields.io/badge/Architecture-C%2B%2B20%20%7C%20Rust%20%7C%20CUDA%20%7C%20Python-orange.svg)](#architecture)
-[![Version: 5.0.0](https://img.shields.io/badge/Release-5.0.0--Enterprise--Production-green.svg)](#release-milestone)
+[![Version: 1.0.0](https://img.shields.io/badge/Release-1.0.0--Enterprise--Production-green.svg)](#release-milestone)
 [![Ecosystem Parity: 2010 to Present](https://img.shields.io/badge/Compatibility-NumPy%20%7C%20PyTorch%20%7C%20JAX%20%7C%20GGUF%20%7C%20HF-blueviolet.svg)](#universal-ecosystem-compatibility)
 
 **VeloGrad** is a bare-metal, native-first, pure-compiled deep learning and autoregressive inference engine engineered from scratch in **C++20, Rust, CUDA/PTX, and Python** by **Ayushman Singh Rathore**.
@@ -125,7 +125,7 @@ print(tokenizer.decode(outputs))
 
 ## Numerical Parity & Verification Benchmarks
 
-| Metric | PyTorch 2.4 | VeloGrad v5.0 | Advantage |
+| Metric | PyTorch 2.4 | VeloGrad v1.0 | Advantage |
 | :--- | :--- | :--- | :--- |
 | **Bit-for-Bit Parity** | Baseline | $\Delta\text{PPL} < 0.01$, $\max|\Delta| < 10^{-4}$ | Identical Convergence |
 | **Model FLOPs Utilization (MFU)** | $48.2\%$ | **$68.9\%$** | $+20.7\%$ Higher Throughput |
@@ -142,17 +142,8 @@ To execute the test suites covering all milestones:
 # Universal Interoperability Suite (2010 to Present)
 python tests/test_velograd_universal_compat.py
 
-# v5.0 Enterprise Production Hardened Master Suite
+# v1.0 Enterprise Production Master Suite
 python tests/test_velograd_v50_production_master.py
-
-# v4.3 Breakthrough Frontier Suite (2:4 Sparsity, Mamba-2, Spatial Multitasker)
-python tests/test_velograd_v43_breakthrough_frontier.py
-
-# v4.2 Roofline Saturation Suite (Async GDS, Ragged Packing, Megakernels)
-python tests/test_velograd_v42_roofline_saturation.py
-
-# v4.1 Enterprise Verification Suite (OCP MXFP4, Chunked Prefill, P2P)
-python tests/test_velograd_v41_enterprise_verification.py
 ```
 
 ---

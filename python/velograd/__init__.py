@@ -44,7 +44,7 @@ from . import compat
 from . import converter
 from .trainer import AutoTrainer
 
-__version__ = "5.0.0-enterprise-production-hardened"
+__version__ = "1.0.0-enterprise-production"
 
 dist = distributed
 compile = compiler.compile
