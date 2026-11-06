@@ -11,12 +11,25 @@ Version 3, 19 November 2007
 Copyright (C) 2026 Ayushman Singh Rathore
 
 ================================================================================
-VELOGRAD DUAL-LICENSING & COMMERCIAL ROYALTY WAIVER NOTICE
+VELOGRAD DUAL-LICENSING, MANDATORY ATTRIBUTION & COMMERCIAL WAIVER NOTICE
 ================================================================================
 
-This software is dual-licensed by the sole copyright holder, Ayushman Singh Rathore:
+This software is authored and dual-licensed exclusively by the sole copyright holder,
+Ayushman Singh Rathore:
 
-1. OPEN-SOURCE NETWORK RECIPROCAL LICENSE (AGPLv3):
+1. MANDATORY ORIGINAL CREATOR ATTRIBUTION & DERIVATIVE WORKS CLAUSE:
+   Under all distributions, forks, modifications, enhancements, optimizations, or
+   upgrades to VeloGrad, prominent and irrevocable attribution to the original author,
+   Ayushman Singh Rathore, is strictly required. Any individual or organization who
+   modifies, builds upon, optimizes, or redistributes this software must:
+     a) Prominently retain the original copyright notice: "Copyright (C) 2026 Ayushman Singh Rathore"
+     b) Prominently state in all documentation, README files, user interfaces, and
+        marketing materials that the software is derived from or based on VeloGrad,
+        naming Ayushman Singh Rathore as the original creator.
+     c) Not remove, alter, or obscure any author attribution or license banners from
+        source files, headers, or runtime telemetry output.
+
+2. OPEN-SOURCE NETWORK RECIPROCAL LICENSE (AGPLv3):
    You may redistribute and/or modify this software under the terms of the GNU
    Affero General Public License as published by the Free Software Foundation,
    either version 3 of the License, or (at your option) any later version.
@@ -29,7 +42,7 @@ This software is dual-licensed by the sole copyright holder, Ayushman Singh Rath
    network server at no charge, through some standard or customary means of
    facilitating copying of software.
 
-2. COMMERCIAL ROYALTY WAIVER & ENTERPRISE LICENSE:
+3. COMMERCIAL ROYALTY WAIVER & ENTERPRISE LICENSE:
    Organizations operating commercial SaaS platforms, proprietary cloud
    inference networks, or enterprise model training pipelines who wish to be
    exempt from AGPLv3 source code disclosure requirements must execute a VeloGrad
@@ -39,7 +52,7 @@ This software is dual-licensed by the sole copyright holder, Ayushman Singh Rath
    a negotiated royalty percentage on infrastructure compute savings or revenue
    generated from models deployed using the VeloGrad runtime engine.
 
-   Contact for Enterprise Licensing: legal@velograd.ai / licensing inquiries
+   Contact for Enterprise Licensing: licensing@velograd.ai / Ayushman Singh Rathore
 
 ================================================================================
                        GNU AFFERO GENERAL PUBLIC LICENSE
