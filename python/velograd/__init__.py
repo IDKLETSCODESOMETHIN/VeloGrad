@@ -42,11 +42,15 @@ from . import rdma
 from . import numerical_stability
 from . import compat
 from . import converter
+from . import kernels
+from . import instruct as _instruct_mod
 from .trainer import AutoTrainer
 
-__version__ = "1.0.0-enterprise-production"
+__version__ = "1.1.0-beta"
 
 dist = distributed
+FSDP = distributed.FSDP
+instruct = _instruct_mod.instruct
 compile = compiler.compile
 mps = backend.mps
 AutoModelForCausalLM = hub.AutoModelForCausalLM
@@ -59,7 +63,7 @@ to_torch = compat.to_torch
 __all__ = [
     "__version__", "Tensor", "zeros", "ones", "randn", "tensor", "matmul", "save", "load",
     "nn", "optim", "functional", "models", "data", "utils", "autograd", "backend", "cuda", "mps", "AutoTrainer",
-    "distributed", "dist", "hub", "quantization", "peft", "export", "compiler", "compile",
+    "distributed", "dist", "FSDP", "instruct", "kernels", "hub", "quantization", "peft", "export", "compiler", "compile",
     "paged_attn", "disaggregated", "telemetry", "triton_kernels", "checkpoint", "ragged", "coexecution",
     "rdma", "numerical_stability", "compat", "converter", "AutoModelForCausalLM", "AutoTokenizer",
     "from_numpy", "to_numpy", "from_torch", "to_torch"

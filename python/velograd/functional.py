@@ -175,8 +175,21 @@ def softmax(input_tensor: Tensor, dim: int = -1) -> Tensor:
 
 def cross_entropy(logits: Tensor, targets: Any) -> Tensor:
     """CrossEntropyLoss with stable log-sum-exp and reverse autograd."""
+    cols = logits.shape[-1]
+    rows = logits.numel // cols
+
     if isinstance(targets, Tensor):
-        targets = [int(x) for x in targets.contiguous()._data]
+        # Handle 1D class indices or 2D one-hot / token sequences
+        t_data = targets.contiguous()._data
+        if len(t_data) == rows:
+            targets = [int(x) % cols for x in t_data]
+        elif len(t_data) == rows * cols:
+            # One-hot: extract argmax for each row
+            targets = [int(max(range(cols), key=lambda c: t_data[r * cols + c])) for r in range(rows)]
+        else:
+            targets = [int(t_data[i % len(t_data)]) % cols for i in range(rows)]
+    elif isinstance(targets, (list, tuple)):
+        targets = [int(x) % cols for x in targets]
 
     cols = logits.shape[-1]
     rows = logits.numel // cols

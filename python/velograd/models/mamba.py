@@ -80,6 +80,8 @@ class Mamba2Block(nn.Module):
             out_ssd[i] = out_ssd[i] * (z_val * sig)
 
         y = self.out_proj(Tensor((total_tokens, self.dim), data=out_ssd))
+        if len(x.shape) == 3:
+            y = y.reshape(x.shape)
         return y + residual
 
 class Mamba2Model(nn.Module):

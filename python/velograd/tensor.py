@@ -15,6 +15,12 @@ from typing import Tuple, List, Optional, Callable, Union, Any
 import math
 import random
 
+try:
+    import numpy as np
+    _NUMPY_AVAILABLE = True
+except ImportError:
+    _NUMPY_AVAILABLE = False
+
 def _compute_strides(shape: Tuple[int, ...]) -> Tuple[int, ...]:
     """Computes contiguous C-order row-major strides for a given shape."""
     if not shape:
@@ -53,13 +59,69 @@ class Tensor:
         self,
         *shape_args: Any,
         data: Optional[List[float]] = None,
+        shape: Optional[Union[Tuple[int, ...], List[int]]] = None,
         strides: Optional[Tuple[int, ...]] = None,
         offset: int = 0,
         requires_grad: bool = False,
     ):
-        if len(shape_args) == 1 and isinstance(shape_args[0], (tuple, list)):
-            self.shape: Tuple[int, ...] = tuple(int(x) for x in shape_args[0])
-        elif len(shape_args) > 0:
+        # Support explicit shape kwarg: Tensor(data, shape=[...]) or Tensor(shape=[...], data=...)
+        if shape is not None:
+            self.shape: Tuple[int, ...] = tuple(int(x) for x in shape)
+            if len(shape_args) == 1 and data is None:
+                shape_val = shape_args[0]
+                if hasattr(shape_val, "tolist"):
+                    data = shape_val.tolist()
+                elif isinstance(shape_val, (list, tuple)):
+                    # Flatten nested list if provided
+                    def _flat(lst):
+                        res = []
+                        for item in lst:
+                            if isinstance(item, (list, tuple)):
+                                res.extend(_flat(item))
+                            else:
+                                res.append(float(item))
+                        return res
+                    data = _flat(shape_val)
+        elif len(shape_args) == 1:
+            arg = shape_args[0]
+            # Handle ndarray or nested list passed as first argument: Tensor([[1, 2], [3, 4]])
+            if hasattr(arg, "shape") and hasattr(arg, "tolist"):
+                self.shape = tuple(int(x) for x in arg.shape)
+                data = arg.tolist()
+            elif isinstance(arg, (tuple, list)) and len(arg) > 0 and isinstance(arg[0], (tuple, list)):
+                def _get_shape_and_flat(lst):
+                    shp = []
+                    curr = lst
+                    while isinstance(curr, (list, tuple)) and len(curr) > 0:
+                        shp.append(len(curr))
+                        curr = curr[0]
+                    res = []
+                    def _fl(items):
+                        for it in items:
+                            if isinstance(it, (list, tuple)):
+                                _fl(it)
+                            else:
+                                res.append(float(it))
+                    _fl(lst)
+                    return tuple(shp), res
+                self.shape, data = _get_shape_and_flat(arg)
+            elif isinstance(arg, (tuple, list)):
+                # Could be shape (e.g. [2, 3]) or 1D data if float/int
+                # If data is provided, arg is the shape
+                if data is not None:
+                    self.shape = tuple(int(x) for x in arg)
+                else:
+                    # Treat as 1D data or shape: if elements are integers, could be shape,
+                    # but if floats are present, treat as 1D data
+                    has_float = any(isinstance(x, float) for x in arg)
+                    if has_float:
+                        self.shape = (len(arg),)
+                        data = [float(x) for x in arg]
+                    else:
+                        self.shape = tuple(int(x) for x in arg)
+            else:
+                self.shape = (int(arg),)
+        elif len(shape_args) > 1:
             self.shape = tuple(int(x) for x in shape_args)
         else:
             self.shape = (0,)
@@ -463,6 +525,46 @@ class Tensor:
         k2, n = other.shape[-2], other.shape[-1]
         assert k1 == k2, f"Shape mismatch in matmul: ({m}, {k1}) vs ({k2}, {n})"
 
+        req_grad = self.requires_grad or other.requires_grad
+
+        if _NUMPY_AVAILABLE:
+            s_arr = np.asarray(self.contiguous()._data, dtype=np.float32).reshape(self.shape)
+            o_arr = np.asarray(other.contiguous()._data, dtype=np.float32).reshape(other.shape)
+            res_arr = np.matmul(s_arr, o_arr)
+            out = Tensor(res_arr.shape, data=res_arr.flatten().tolist(), requires_grad=req_grad)
+            if req_grad:
+                out._prev = [self, other]
+                def _backward(grad: 'Tensor'):
+                    g_arr = np.asarray(grad.contiguous()._data, dtype=np.float32).reshape(grad.shape)
+                    if self.requires_grad:
+                        if self.grad is None:
+                            self.grad = Tensor(self.shape, requires_grad=False)
+                        o_T = np.swapaxes(o_arr, -1, -2)
+                        d_self = np.matmul(g_arr, o_T)
+                        if d_self.shape != self.shape:
+                            axes = tuple(range(d_self.ndim - len(self.shape)))
+                            for ax in range(len(self.shape)):
+                                if self.shape[ax] == 1 and d_self.shape[ax + len(axes)] > 1:
+                                    axes += (ax + len(axes),)
+                            d_self = np.sum(d_self, axis=axes, keepdims=True).reshape(self.shape)
+                        cur_g = np.asarray(self.grad._data, dtype=np.float32).reshape(self.shape) + d_self
+                        self.grad._data = cur_g.flatten().tolist()
+                    if other.requires_grad:
+                        if other.grad is None:
+                            other.grad = Tensor(other.shape, requires_grad=False)
+                        s_T = np.swapaxes(s_arr, -1, -2)
+                        d_other = np.matmul(s_T, g_arr)
+                        if d_other.shape != other.shape:
+                            axes = tuple(range(d_other.ndim - len(other.shape)))
+                            for ax in range(len(other.shape)):
+                                if other.shape[ax] == 1 and d_other.shape[ax + len(axes)] > 1:
+                                    axes += (ax + len(axes),)
+                            d_other = np.sum(d_other, axis=axes, keepdims=True).reshape(other.shape)
+                        cur_g = np.asarray(other.grad._data, dtype=np.float32).reshape(other.shape) + d_other
+                        other.grad._data = cur_g.flatten().tolist()
+                out._grad_fn = _backward
+            return out
+
         b_self = self.shape[:-2]
         b_other = other.shape[:-2]
         batch_shape = _broadcast_shapes(b_self, b_other) if (b_self or b_other) else ()
@@ -472,7 +574,6 @@ class Tensor:
         for b in batch_shape:
             batch_count *= b
 
-        req_grad = self.requires_grad or other.requires_grad
         out = Tensor(out_shape, requires_grad=req_grad)
 
         s_mat = self.contiguous()._data
@@ -647,7 +748,10 @@ def ones(*shape: Any, requires_grad: bool = False) -> Tensor:
 
 def randn(*shape: Any, requires_grad: bool = False) -> Tensor:
     t = Tensor(*shape, requires_grad=requires_grad)
-    t._data = [random.gauss(0.0, 1.0) for _ in range(t.numel)]
+    if _NUMPY_AVAILABLE:
+        t._data = np.random.standard_normal(t.numel).astype(np.float32).tolist()
+    else:
+        t._data = [random.gauss(0.0, 1.0) for _ in range(t.numel)]
     return t
 
 def tensor(data: Any, requires_grad: bool = False) -> Tensor:

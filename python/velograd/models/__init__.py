@@ -12,10 +12,11 @@ from .resnet import ResNet18, BasicBlock
 from .moe import MoEModel, MoETransformerBlock, MoEFeedForward, MoEGate
 from .multimodal import VisionLanguageModel, VisionTransformer, PatchEmbedding, MultimodalProjector
 from .mamba import Mamba2Model, Mamba2Block
+from .families import MODEL_REGISTRY, build_model_from_family
 
 __all__ = [
     "LLaMAModel", "LLaMATransformerBlock", "LLaMAFeedForward", "ResNet18", "BasicBlock",
     "MoEModel", "MoETransformerBlock", "MoEFeedForward", "MoEGate",
     "VisionLanguageModel", "VisionTransformer", "PatchEmbedding", "MultimodalProjector",
-    "Mamba2Model", "Mamba2Block"
+    "Mamba2Model", "Mamba2Block", "MODEL_REGISTRY", "build_model_from_family"
 ]

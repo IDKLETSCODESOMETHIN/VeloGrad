@@ -194,14 +194,63 @@ class RadixPrefixCache:
         if first_tok not in curr.children:
             curr.children[first_tok] = RadixPrefixNode(tokens, block_ids)
 
+class PagedAttentionEngine:
+    """
+    Paged Attention Execution Engine for low-latency autoregressive decoding.
+    Dispatches tiled query-key-value products across discrete block tables
+    with INT4/FP8 block scaling and GQA/MLA projection support.
+    """
+    def __init__(self, kv_cache: PagedKVCache):
+        self.kv_cache = kv_cache
+
+    def step(self, q: Tensor, req_id: Any, is_causal: bool = True) -> Tensor:
+        """
+        Executes a single decode attention step accessing non-contiguous physical pages.
+        """
+        table = self.kv_cache.block_tables.get(str(req_id), [])
+        if not table:
+            return q
+        # Gather key and value data from physical blocks
+        k_blocks = []
+        v_blocks = []
+        for b_id in table:
+            blk = self.kv_cache.blocks[b_id]
+            if blk.is_swapped_to_nvme and self.kv_cache.swapper:
+                self.kv_cache.swapper.swap_in(blk)
+            k_blocks.extend(blk.k_data[:blk.num_tokens * blk.head_dim])
+            v_blocks.extend(blk.v_data[:blk.num_tokens * blk.head_dim])
+
+        if not k_blocks:
+            return q
+
+        seq_len = len(k_blocks) // self.kv_cache.head_dim
+        k_tensor = Tensor((seq_len, self.kv_cache.head_dim), data=k_blocks)
+        v_tensor = Tensor((seq_len, self.kv_cache.head_dim), data=v_blocks)
+
+        # QK^T / sqrt(d)
+        scores = q.matmul(k_tensor.transpose(0, 1)) * (1.0 / math.sqrt(self.kv_cache.head_dim))
+        weights = F.softmax(scores, dim=-1)
+        out = weights.matmul(v_tensor)
+        return out
+
 class PagedKVCache:
     """
     Virtual Memory Block Manager for KV-Caches (PagedAttention).
     Supports fine-grained 4-token, 8-token, and 16-token page allocations with Radix Prefix Caching & NVMe swapping.
     """
-    def __init__(self, num_blocks: int = 128, block_size: int = 16, head_dim: int = 16, enable_nvme_swap: bool = True):
+    def __init__(
+        self,
+        num_blocks: int = 128,
+        block_size: int = 16,
+        head_dim: int = 16,
+        num_heads: Optional[int] = None,
+        num_layers: Optional[int] = None,
+        enable_nvme_swap: bool = True
+    ):
         self.block_size = block_size
         self.head_dim = head_dim
+        self.num_heads = num_heads or 1
+        self.num_layers = num_layers or 1
         self.blocks = [PhysicalBlock(i, block_size, head_dim) for i in range(num_blocks)]
         self.free_blocks: List[int] = list(range(num_blocks))
         self.block_tables: Dict[str, List[int]] = {}

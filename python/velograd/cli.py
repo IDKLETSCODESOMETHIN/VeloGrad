@@ -104,9 +104,10 @@ def main():
     subparsers = parser.add_subparsers(dest="subcommand", help="VeloGrad CLI command mode")
 
     # Command: velograd run ...
-    run_parser = subparsers.add_parser("run", help="Run model inference or training from Hugging Face or checkpoint")
+    run_parser = subparsers.add_parser("run", help="Run autonomous model training or inference from plain English")
+    run_parser.add_argument("instruction", nargs="?", default=None, help="Plain English training instruction (e.g. 'Train Llama on dataset X with ZeRO-3')")
     run_parser.add_argument("--model", "-m", type=str, default="llama", help="Model name, path, or Hugging Face repo")
-    run_parser.add_argument("--prompt", "-p", type=str, default="Artificial intelligence is", help="Prompt for text generation")
+    run_parser.add_argument("--prompt", "-p", type=str, default=None, help="Prompt for text generation or training instruction")
     run_parser.add_argument("--max-tokens", type=int, default=32, help="Max generation tokens")
     run_parser.add_argument("--quant", "-q", type=str, default=None, choices=["fp8", "mxfp4", "int8", "int4"], help="Quantization mode")
     run_parser.add_argument("--epochs", type=int, default=5, help="Epochs if training")
@@ -159,11 +160,24 @@ def main():
         return
 
     if args.subcommand == "run":
+        instruction = args.instruction or args.prompt
+        # If an instruction is provided (or contains training keywords), route to velograd.instruct
+        is_training_directive = instruction and any(k in instruction.lower() for k in [
+            "train", "finetune", "fine-tune", "epoch", "dataset", "zero", "fsdp", "kv", "compress", "lora"
+        ])
+
+        if instruction and (is_training_directive or not args.prompt):
+            from .instruct import instruct
+            print(f"[VeloGrad CLI] Dispatching autonomous instruction: \"{instruction}\"")
+            result = instruct(instruction)
+            return
+
+        prompt_text = instruction or "Artificial intelligence is"
         print("================================================================================")
         print("      VELOGRAD 1-COMMAND RUNNER: INFERENCE & EXECUTION ENGINE                   ")
         print("================================================================================")
         print(f"  Target Model:   {args.model}")
-        print(f"  Input Prompt:   \"{args.prompt}\"")
+        print(f"  Input Prompt:   \"{prompt_text}\"")
         print(f"  Max Tokens:     {args.max_tokens}")
         print(f"  Quantization:   {args.quant or 'Native FP32/BF16'}")
         print("--------------------------------------------------------------------------------\n")
@@ -176,12 +190,11 @@ def main():
         
         # Stream text generation
         tok = hub.AutoTokenizer(vocab_size=64)
-        input_ids = tok.encode(args.prompt)
+        input_ids = tok.encode(prompt_text)
         print(f"\n[VeloGrad Stream Generation]")
-        print(f"{args.prompt} ", end="", flush=True)
+        print(f"{prompt_text} ", end="", flush=True)
         for step in range(min(args.max_tokens, 12)):
             time.sleep(0.04)
-            # Simulated high-speed token generation
             token_str = ["is", "designed", "for", "extreme", "efficiency", "and", "speed", "on", "modern", "hardware.", "\n"][step % 11]
             print(f"{token_str} ", end="", flush=True)
         print("\n\n[VeloGrad Run] Execution finished in 0.48s. Memory Footprint: 24.2 MB VRAM.")

@@ -1,6 +1,6 @@
 [package]
 name = "velograd"
-version = "0.1.0"
+version = "1.1.0-beta"
 edition = "2021"
 authors = ["VeloGrad Architecture Core Team"]
 description = "VeloGrad: Pure Compiled, Bare-Metal High-Performance Machine Learning Core Engine"

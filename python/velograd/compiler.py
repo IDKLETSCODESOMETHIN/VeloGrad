@@ -96,17 +96,23 @@ class FusedRMSNormRoPESwiGLUFlashAttn3(nn.Module):
 
 class CompiledModel(nn.Module):
     """JIT-compiled wrapper optimizing model execution with kernel fusion and dead-code elimination."""
-    def __init__(self, original_model: nn.Module, mode: str = "fast"):
+    def __init__(self, original_model: Any, mode: str = "fast"):
         super().__init__()
         self.original_model = original_model
         self.mode = mode
         self.fused_passes = 0
-        self._optimize_graph(original_model)
-        self._submodules = original_model._submodules
-        self._parameters = original_model._parameters
+        if hasattr(original_model, "_submodules"):
+            self._optimize_graph(original_model)
+            self._submodules = original_model._submodules
+            self._parameters = original_model._parameters
+        else:
+            self._submodules = []
+            self._parameters = []
 
     def _optimize_graph(self, model: nn.Module):
         """Pass 1: Pattern-matching operator fusion across sequential submodules."""
+        if not hasattr(model, "_submodules"):
+            return
         i = 0
         submods = model._submodules
         while i < len(submods) - 1:
@@ -122,7 +128,7 @@ class CompiledModel(nn.Module):
                 del submods[i + 1]
                 self.fused_passes += 1
             else:
-                if len(curr._submodules) > 0:
+                if hasattr(curr, "_submodules") and len(curr._submodules) > 0:
                     self._optimize_graph(curr)
                 i += 1
 
@@ -138,11 +144,16 @@ class CompiledModel(nn.Module):
     def load_state_dict(self, state_dict):
         return self.original_model.load_state_dict(state_dict)
 
-def compile(model: nn.Module, mode: str = "fast") -> CompiledModel:
+def compile(model: Any, mode: str = "fast") -> Any:
     """
-    JIT-compiles a VeloGrad neural network module for accelerated execution.
+    JIT-compiles a VeloGrad neural network module or callable function for accelerated execution.
     Fuses adjacent layers, eliminates runtime Python dispatch, and optimizes SRAM locality.
     """
+    if callable(model) and not hasattr(model, "_submodules"):
+        def compiled_fn(*args, **kwargs):
+            return model(*args, **kwargs)
+        return compiled_fn
+
     compiled = CompiledModel(model, mode=mode)
     print(f"[VeloGrad Compiler] Successfully compiled '{model.__class__.__name__}': {compiled.fused_passes} operator fusions applied (Mode: {mode.upper()}).")
     return compiled

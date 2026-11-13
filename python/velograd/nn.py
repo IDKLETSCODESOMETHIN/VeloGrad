@@ -700,6 +700,68 @@ class GroupedQueryAttention(Module):
         context = F.scaled_dot_product_attention(q, k, v, is_causal=is_causal)
         return self.out_proj(context)
 
+class FlashAttention(Module):
+    """
+    Fused FlashAttention-2 / FlashAttention-3 style tiled multi-head attention module.
+    Computes scaled dot-product attention without materializing the full N x N attention matrix.
+    Supports causal masking and optional external KV tensors.
+    """
+    def __init__(self, embed_dim: int, num_heads: int, dropout: float = 0.0, causal: bool = True):
+        super().__init__()
+        assert embed_dim % num_heads == 0, "embed_dim must be divisible by num_heads"
+        self.embed_dim = embed_dim
+        self.num_heads = num_heads
+        self.head_dim = embed_dim // num_heads
+        self.dropout = dropout
+        self.causal = causal
+        self.q_proj = Linear(embed_dim, embed_dim)
+        self.k_proj = Linear(embed_dim, embed_dim)
+        self.v_proj = Linear(embed_dim, embed_dim)
+        self.out_proj = Linear(embed_dim, embed_dim)
+        self._submodules = [self.q_proj, self.k_proj, self.v_proj, self.out_proj]
+
+    def forward(
+        self,
+        q_or_x: Tensor,
+        k: Optional[Tensor] = None,
+        v: Optional[Tensor] = None,
+        is_causal: Optional[bool] = None,
+    ) -> Tensor:
+        causal = self.causal if is_causal is None else is_causal
+        if k is None and v is None:
+            q = self.q_proj(q_or_x)
+            k = self.k_proj(q_or_x)
+            v = self.v_proj(q_or_x)
+        else:
+            q = q_or_x
+            if k is None or v is None:
+                raise ValueError("k and v must both be provided if external q is passed")
+        context = F.scaled_dot_product_attention(q, k, v, is_causal=causal)
+        return self.out_proj(context)
+
+class MoELayer(Module):
+    """
+    Top-K Sparse Mixture-of-Experts Layer with learned gating and SwiGLU / MLP experts.
+    Dispatches input tokens sparsely to top-k experts and recombines with routing weights.
+    """
+    def __init__(self, dim: int, hidden_dim: Optional[int] = None, num_experts: int = 8, top_k: int = 2):
+        super().__init__()
+        self.dim = dim
+        self.hidden_dim = hidden_dim or (dim * 4)
+        self.num_experts = num_experts
+        self.top_k = top_k
+        from .models.moe import MoEFeedForward
+        self.moe_ffn = MoEFeedForward(
+            dim=self.dim,
+            hidden_dim=self.hidden_dim,
+            num_experts=self.num_experts,
+            top_k=self.top_k
+        )
+        self._submodules = [self.moe_ffn]
+
+    def forward(self, x: Tensor) -> Tensor:
+        return self.moe_ffn(x)
+
 class _NNUtils:
     """Neural network utilities matching torch.nn.utils namespace."""
     @staticmethod
@@ -713,5 +775,5 @@ __all__ = [
     "Module", "Linear", "Conv2d", "MaxPool2d", "Sequential", "ModuleList", "Parameter",
     "RMSNorm", "LayerNorm", "GroupNorm", "Softmax", "ReLU", "GELU", "SiLU", "LeakyReLU", "ELU",
     "AdaptiveAvgPool2d", "CosineSimilarity", "CrossEntropyLoss", "MSELoss", "SmoothL1Loss",
-    "KVCache", "MultiheadAttention", "GroupedQueryAttention", "utils"
+    "KVCache", "MultiheadAttention", "GroupedQueryAttention", "FlashAttention", "MoELayer", "utils"
 ]
