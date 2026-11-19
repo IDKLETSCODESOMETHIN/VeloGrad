@@ -139,17 +139,23 @@ def instruct(prompt: str, dataset: Optional[Any] = None, **kwargs) -> Dict[str, 
         ep_loss = 0.0
         n_batches = len(dataset) // batch_size
         for b in range(max(1, n_batches)):
-            x, y = dataset[b]
+            # TensorDataset.__getitem__ returns List[float] slices, not Tensor objects.
+            # Reconstruct a proper (1, dim) Tensor so the model's matmul path works correctly.
+            x_raw, y_raw = dataset[b]
+            x_dim = len(x_raw)
+            x = Tensor((1, x_dim), requires_grad=False)
+            x._data = list(x_raw)
+
+            optimizer.zero_grad()
             out = model(x)
-            loss = criterion(out, y)
+            loss = criterion(out, y_raw)
             loss.backward()
             optimizer.step()
-            optimizer.zero_grad()
             ep_loss += float(loss._data[0]) if hasattr(loss, "_data") else 1.0
 
         avg_loss = ep_loss / max(1, n_batches)
         history.append(avg_loss)
-        print(f"  [Epoch {ep+1}/{epochs}] Loss: {avg_loss:.4f} | KV VRAM Savings: 66.7% | ZeRO-3: OK")
+        print(f"  [Epoch {ep+1}/{epochs}] Loss: {avg_loss:.4f}")
 
     print(f"\n[velograd.instruct] Autonomous execution complete. Final loss: {history[-1]:.4f}")
     return {

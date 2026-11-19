@@ -11,7 +11,7 @@ Matches PyTorch torch.nn module hierarchy 1:1 with bare-metal autograd accelerat
 N-dimensional tensor support, exact analytic normalizations, and KV-cache autoregressive inference.
 """
 
-from typing import List, Optional, Dict, Tuple, Any
+from typing import List, Optional, Dict, Tuple, Any, Union
 import math
 import random
 from .tensor import Tensor, zeros, ones

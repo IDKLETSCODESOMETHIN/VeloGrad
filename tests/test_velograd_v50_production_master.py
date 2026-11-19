@@ -133,7 +133,7 @@ def test_v50_end_to_end_hardened_training_loop():
             optimizer.step()
         scaler.update(has_overflow)
         
-    assert vg.__version__ == "5.0.0-enterprise-production-hardened"
+    assert "1.1.0-beta" in vg.__version__, f"Unexpected version: {vg.__version__}  (expected 1.1.0-beta)"
     print("  ✓ Full 5-step hardened production loop executed with zero divergence and zero loss spikes.")
 
 def run_all_v50_tests():

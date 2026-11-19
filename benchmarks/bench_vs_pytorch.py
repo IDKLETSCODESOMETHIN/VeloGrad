@@ -137,7 +137,7 @@ def main():
     print(f"      Step Latency: {step_ms:.2f} ms | Throughput: {tok_s:.1f} tokens/sec")
 
     print("\n" + "=" * 80)
-    print(">>> ZERO-DEFECT PASS: Compute benchmark suite verified successfully.")
+    print(">>> Compute benchmark suite completed successfully.")
     print("=" * 80)
 
 if __name__ == "__main__":

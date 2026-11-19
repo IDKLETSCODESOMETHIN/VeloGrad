@@ -18,7 +18,7 @@ import os
 import sys
 import math
 import ctypes
-from typing import List, Optional, Any
+from typing import List, Optional, Any, Dict
 from .tensor import Tensor, zeros
 
 # -----------------------------------------------------------------------------

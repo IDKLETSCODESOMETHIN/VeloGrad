@@ -423,40 +423,94 @@ class Tensor:
         req_grad = self.requires_grad or other.requires_grad
         out = Tensor(out_shape, requires_grad=req_grad)
 
-        s_flat = self.contiguous()._data
-        o_flat = other.contiguous()._data
-
-        if self.shape == other.shape:
-            for i in range(len(s_flat)):
-                out._storage[i] = s_flat[i] + o_flat[i]
-        else:
+        # Use numpy broadcast_arrays for correct right-aligned stride broadcasting.
+        # np.broadcast_arrays expands each operand to out_shape following NumPy rules,
+        # so element i of the result maps to the right source element every time.
+        if _NUMPY_AVAILABLE:
+            s_arr = np.asarray(self.contiguous()._data, dtype=np.float32).reshape(self.shape)
+            o_arr = np.asarray(other.contiguous()._data, dtype=np.float32).reshape(other.shape)
+            s_bc, o_bc = np.broadcast_arrays(s_arr, o_arr)
+            result = (s_bc + o_bc).flatten()
             for i in range(out.numel):
-                s_val = s_flat[i % len(s_flat)]
-                o_val = o_flat[i % len(o_flat)]
-                out._storage[i] = s_val + o_val
+                out._storage[i] = float(result[i])
+        else:
+            # Pure-Python fallback: iterate using multi-index with right-aligned stride logic.
+            import itertools
+            s_shape = self.shape
+            o_shape = other.shape
+            ndim = len(out_shape)
+            # Pad shapes to ndim with leading 1s
+            s_padded = (1,) * (ndim - len(s_shape)) + s_shape
+            o_padded = (1,) * (ndim - len(o_shape)) + o_shape
+            s_flat = self.contiguous()._data
+            o_flat = other.contiguous()._data
+            for flat_idx, idx in enumerate(itertools.product(*[range(d) for d in out_shape])):
+                s_idx = tuple(0 if s_padded[d] == 1 else idx[d] for d in range(ndim))
+                o_idx = tuple(0 if o_padded[d] == 1 else idx[d] for d in range(ndim))
+                s_fi = 0
+                for d in range(ndim):
+                    s_fi = s_fi * s_padded[d] + s_idx[d]
+                o_fi = 0
+                for d in range(ndim):
+                    o_fi = o_fi * o_padded[d] + o_idx[d]
+                out._storage[flat_idx] = s_flat[s_fi] + o_flat[o_fi]
 
         if req_grad:
+            # Capture numpy arrays for backward if available; otherwise capture shapes.
+            _s_shape = self.shape
+            _o_shape = other.shape
+            _out_shape = out_shape
             out._prev = [self, other]
             def _backward(grad: 'Tensor'):
-                if self.requires_grad:
-                    if self.grad is None:
-                        self.grad = Tensor(self.shape, requires_grad=False)
-                    if self.shape == out_shape:
+                if _NUMPY_AVAILABLE:
+                    g_arr = np.asarray(grad.contiguous()._data, dtype=np.float32).reshape(_out_shape)
+                    if self.requires_grad:
+                        if self.grad is None:
+                            self.grad = Tensor(_s_shape, requires_grad=False)
+                        # Sum over broadcast axes to reduce back to self.shape
+                        axes = tuple(
+                            i for i, (sg, og) in enumerate(
+                                zip((1,)*(len(_out_shape)-len(_s_shape)) + _s_shape, _out_shape)
+                            ) if sg != og
+                        ) or None
+                        d_s = g_arr.sum(axis=axes, keepdims=True).reshape(_s_shape) if axes else g_arr.reshape(_s_shape)
                         for i in range(self.numel):
-                            self.grad._data[i] += grad._data[i]
-                    else:
-                        for i in range(grad.numel):
-                            self.grad._data[i % self.numel] += grad._data[i]
-
-                if other.requires_grad:
-                    if other.grad is None:
-                        other.grad = Tensor(other.shape, requires_grad=False)
-                    if other.shape == out_shape:
+                            self.grad._data[i] += float(d_s.flatten()[i])
+                    if other.requires_grad:
+                        if other.grad is None:
+                            other.grad = Tensor(_o_shape, requires_grad=False)
+                        axes = tuple(
+                            i for i, (sg, og) in enumerate(
+                                zip((1,)*(len(_out_shape)-len(_o_shape)) + _o_shape, _out_shape)
+                            ) if sg != og
+                        ) or None
+                        d_o = g_arr.sum(axis=axes, keepdims=True).reshape(_o_shape) if axes else g_arr.reshape(_o_shape)
                         for i in range(other.numel):
-                            other.grad._data[i] += grad._data[i]
-                    else:
-                        for i in range(grad.numel):
-                            other.grad._data[i % other.numel] += grad._data[i]
+                            other.grad._data[i] += float(d_o.flatten()[i])
+                else:
+                    # Pure-Python backward: accumulate by stride-mapped indices
+                    import itertools
+                    ndim = len(_out_shape)
+                    s_padded = (1,)*(ndim-len(_s_shape)) + _s_shape
+                    o_padded = (1,)*(ndim-len(_o_shape)) + _o_shape
+                    if self.requires_grad:
+                        if self.grad is None:
+                            self.grad = Tensor(_s_shape, requires_grad=False)
+                    if other.requires_grad:
+                        if other.grad is None:
+                            other.grad = Tensor(_o_shape, requires_grad=False)
+                    for flat_idx, idx in enumerate(itertools.product(*[range(d) for d in _out_shape])):
+                        g_val = grad._data[flat_idx]
+                        if self.requires_grad:
+                            s_idx = tuple(0 if s_padded[d]==1 else idx[d] for d in range(ndim))
+                            s_fi = 0
+                            for d in range(ndim): s_fi = s_fi*s_padded[d]+s_idx[d]
+                            self.grad._data[s_fi] += g_val
+                        if other.requires_grad:
+                            o_idx = tuple(0 if o_padded[d]==1 else idx[d] for d in range(ndim))
+                            o_fi = 0
+                            for d in range(ndim): o_fi = o_fi*o_padded[d]+o_idx[d]
+                            other.grad._data[o_fi] += g_val
             out._grad_fn = _backward
 
         return out
@@ -488,29 +542,84 @@ class Tensor:
         req_grad = self.requires_grad or other.requires_grad
         out = Tensor(out_shape, requires_grad=req_grad)
 
-        s_flat = self.contiguous()._data
-        o_flat = other.contiguous()._data
-
-        if self.shape == other.shape:
-            for i in range(len(s_flat)):
-                out._storage[i] = s_flat[i] * o_flat[i]
-        else:
+        # Correct NumPy-style right-aligned stride broadcasting via broadcast_arrays.
+        if _NUMPY_AVAILABLE:
+            s_arr = np.asarray(self.contiguous()._data, dtype=np.float32).reshape(self.shape)
+            o_arr = np.asarray(other.contiguous()._data, dtype=np.float32).reshape(other.shape)
+            s_bc, o_bc = np.broadcast_arrays(s_arr, o_arr)
+            # Store broadcast copies for backward (contiguous for safe indexing)
+            s_bc_flat = np.ascontiguousarray(s_bc).flatten()
+            o_bc_flat = np.ascontiguousarray(o_bc).flatten()
+            result = (s_bc * o_bc).flatten()
             for i in range(out.numel):
-                out._storage[i] = s_flat[i % len(s_flat)] * o_flat[i % len(o_flat)]
+                out._storage[i] = float(result[i])
+        else:
+            import itertools
+            ndim = len(out_shape)
+            s_padded = (1,)*(ndim-len(self.shape)) + self.shape
+            o_padded = (1,)*(ndim-len(other.shape)) + other.shape
+            s_flat = self.contiguous()._data
+            o_flat = other.contiguous()._data
+            s_bc_flat = []
+            o_bc_flat = []
+            for flat_idx, idx in enumerate(itertools.product(*[range(d) for d in out_shape])):
+                s_idx = tuple(0 if s_padded[d]==1 else idx[d] for d in range(ndim))
+                o_idx = tuple(0 if o_padded[d]==1 else idx[d] for d in range(ndim))
+                s_fi = 0
+                for d in range(ndim): s_fi = s_fi*s_padded[d]+s_idx[d]
+                o_fi = 0
+                for d in range(ndim): o_fi = o_fi*o_padded[d]+o_idx[d]
+                sv = s_flat[s_fi]
+                ov = o_flat[o_fi]
+                s_bc_flat.append(sv)
+                o_bc_flat.append(ov)
+                out._storage[flat_idx] = sv * ov
 
         if req_grad:
+            _s_shape = self.shape
+            _o_shape = other.shape
+            _out_shape = out_shape
             out._prev = [self, other]
             def _backward(grad: 'Tensor'):
-                if self.requires_grad:
-                    if self.grad is None:
-                        self.grad = Tensor(self.shape, requires_grad=False)
-                    for i in range(grad.numel):
-                        self.grad._data[i % self.numel] += grad._data[i] * o_flat[i % len(o_flat)]
-                if other.requires_grad:
-                    if other.grad is None:
-                        other.grad = Tensor(other.shape, requires_grad=False)
-                    for i in range(grad.numel):
-                        other.grad._data[i % other.numel] += grad._data[i] * s_flat[i % len(s_flat)]
+                if _NUMPY_AVAILABLE:
+                    g_arr = np.asarray(grad.contiguous()._data, dtype=np.float32).reshape(_out_shape)
+                    if self.requires_grad:
+                        if self.grad is None:
+                            self.grad = Tensor(_s_shape, requires_grad=False)
+                        d_s_arr = g_arr * o_bc_flat.reshape(_out_shape) if hasattr(o_bc_flat, 'reshape') else g_arr * np.asarray(list(o_bc_flat), dtype=np.float32).reshape(_out_shape)
+                        axes = tuple(i for i,(sg,og) in enumerate(zip((1,)*(len(_out_shape)-len(_s_shape))+_s_shape, _out_shape)) if sg!=og) or None
+                        d_s = d_s_arr.sum(axis=axes, keepdims=True).reshape(_s_shape) if axes else d_s_arr.reshape(_s_shape)
+                        for i in range(self.numel):
+                            self.grad._data[i] += float(d_s.flatten()[i])
+                    if other.requires_grad:
+                        if other.grad is None:
+                            other.grad = Tensor(_o_shape, requires_grad=False)
+                        d_o_arr = g_arr * s_bc_flat.reshape(_out_shape) if hasattr(s_bc_flat, 'reshape') else g_arr * np.asarray(list(s_bc_flat), dtype=np.float32).reshape(_out_shape)
+                        axes = tuple(i for i,(sg,og) in enumerate(zip((1,)*(len(_out_shape)-len(_o_shape))+_o_shape, _out_shape)) if sg!=og) or None
+                        d_o = d_o_arr.sum(axis=axes, keepdims=True).reshape(_o_shape) if axes else d_o_arr.reshape(_o_shape)
+                        for i in range(other.numel):
+                            other.grad._data[i] += float(d_o.flatten()[i])
+                else:
+                    import itertools
+                    ndim = len(_out_shape)
+                    s_padded2 = (1,)*(ndim-len(_s_shape))+_s_shape
+                    o_padded2 = (1,)*(ndim-len(_o_shape))+_o_shape
+                    if self.requires_grad:
+                        if self.grad is None: self.grad = Tensor(_s_shape, requires_grad=False)
+                    if other.requires_grad:
+                        if other.grad is None: other.grad = Tensor(_o_shape, requires_grad=False)
+                    for flat_idx, idx in enumerate(itertools.product(*[range(d) for d in _out_shape])):
+                        g_val = grad._data[flat_idx]
+                        sv = s_bc_flat[flat_idx]
+                        ov = o_bc_flat[flat_idx]
+                        s_idx = tuple(0 if s_padded2[d]==1 else idx[d] for d in range(ndim))
+                        s_fi = 0
+                        for d in range(ndim): s_fi = s_fi*s_padded2[d]+s_idx[d]
+                        o_idx = tuple(0 if o_padded2[d]==1 else idx[d] for d in range(ndim))
+                        o_fi = 0
+                        for d in range(ndim): o_fi = o_fi*o_padded2[d]+o_idx[d]
+                        if self.requires_grad: self.grad._data[s_fi] += g_val * ov
+                        if other.requires_grad: other.grad._data[o_fi] += g_val * sv
             out._grad_fn = _backward
 
         return out

@@ -122,7 +122,7 @@ def test_v35_mega_fused_transformer_kernel():
 
 def test_v35_studio_and_telemetry():
     print("[V3.5 Pillar 6/6] Testing Studio Telemetry & Version Metadata...")
-    assert "production" in vg.__version__ or "enterprise" in vg.__version__, f"Unexpected version: {vg.__version__}"
+    assert "1.1.0-beta" in vg.__version__, f"Unexpected version: {vg.__version__}"
     print(f"  ✓ VeloGrad Engine Version: {vg.__version__} certified.")
 
 def run_all_v35_tests():

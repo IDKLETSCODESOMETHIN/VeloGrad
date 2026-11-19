@@ -1,3 +1,4 @@
+from __future__ import annotations
 # =================================================================================================
 # PROJECT: VeloGrad Engine Core (Bare-Metal Neural Compute Framework)
 # MODULE: PagedAttention & Continuous Dynamic Batching (velograd.paged_attn / vLLM Parity)
@@ -18,6 +19,7 @@ import math
 import os
 import tempfile
 import mmap
+import uuid
 from typing import Dict, List, Tuple, Optional, Any, Set
 from .tensor import Tensor, zeros
 from . import functional as F
@@ -53,7 +55,7 @@ class OutOfCorePageSwapper:
     """
     def __init__(self, swap_dir: Optional[str] = None, max_swap_bytes: int = 1024 * 1024 * 1024):
         self.swap_dir = swap_dir or tempfile.gettempdir()
-        self.swap_file_path = os.path.join(self.swap_dir, f"velograd_nvme_swap_{os.getpid()}.bin")
+        self.swap_file_path = os.path.join(self.swap_dir, f"velograd_nvme_swap_{os.getpid()}_{uuid.uuid4().hex}.bin")
         self.max_swap_bytes = max_swap_bytes
         self.allocated_swap_bytes = 0
         self.swap_fd = open(self.swap_file_path, "wb+")
@@ -109,6 +111,9 @@ class OutOfCorePageSwapper:
                 os.remove(self.swap_file_path)
         except Exception:
             pass
+
+    def __del__(self):
+        self.close()
 
 class SharedMemoryArena:
     """

@@ -154,7 +154,7 @@ def test_v40_fuzzing_and_memory_safety():
     
     assert x.grad is not None and w.grad is not None, "Autograd backward gradient missing"
     assert x.grad.shape == (8, 16) and w.grad.shape == (16, 8), "Gradient shape mismatch"
-    assert "enterprise" in vg.__version__, f"Unexpected version: {vg.__version__}"
+    assert "1.1.0-beta" in vg.__version__, f"Unexpected version: {vg.__version__}"
     print(f"  ✓ Zero memory leaks, zero gradient divergence verified across synthetic fuzzing runs.")
 
 def run_all_v40_tests():

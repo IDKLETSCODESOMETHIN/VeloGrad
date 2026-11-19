@@ -8,14 +8,14 @@
 
 **VeloGrad** is a bare-metal, native-first, pure-compiled deep learning and autoregressive inference engine engineered from scratch in **C++20, Rust, CUDA, and Python** by **Ayushman Singh Rathore**.
 
-It eliminates Python runtime overhead, framework memory bloat, and garbage collection pauses by introducing an aligned static arena memory architecture, ahead-of-time (AOT) fused compute kernels, an empirical **~66.7% KV-cache and activation VRAM reduction engine**, enterprise **ZeRO-3 / FSDP distributed scaling with CPU/NVMe offload**, and a **natural-language autonomous training orchestrator** (`velograd.instruct`).
+It eliminates Python runtime overhead, framework memory bloat, and garbage collection pauses by introducing an aligned static arena memory architecture, ahead-of-time (AOT) fused compute kernels, a **Paged KV-cache virtual memory engine** (designed to reduce KV-cache fragmentation), **ZeRO-3 / FSDP distributed scaling with CPU/NVMe offload**, and a **natural-language autonomous training orchestrator** (`velograd.instruct`).
 
 ---
 
 > [!IMPORTANT]
 > ### Public Beta Notice (`v1.1.0-beta`)
 > **VeloGrad `v1.1.0-beta` is now in public beta.**  
-> All core compute kernels, hardware-fused operators, universal frontier model architectures (from 100M edge models up to 1T+ parameter MoE networks), Paged KV-cache VRAM reduction, ZeRO-3 FSDP parameter sharding, and natural-language autonomous training directives (`velograd.instruct`) have been verified with complete zero-defect automated test and benchmark suites. Community testing, empirical benchmarks, and feedback are actively welcomed.
+> The Python tensor engine, autograd, fused SIMD kernels, ZeRO-3 FSDP simulation, and `velograd.instruct` orchestrator are verified on CPU in CI. CUDA kernels are written but have **not** been tested on physical NVIDIA hardware. KV-cache VRAM reduction numbers require real GPU hardware to measure — no GPU-side benchmarks have been run. Community testing and feedback are actively welcomed.
 
 ---
 
@@ -45,9 +45,9 @@ Complete hardware-accelerated kernels implemented in both native CUDA (`src/cuda
 - **Fused Top-K MoE Routing**: Shared-memory probability reduction and sparse token dispatch.
 - **Fused Multi-Tensor AdamW**: Vectorized in-place first and second moment updates with fused weight decay.
 
-### 2. Real 66.7% KV-Cache & Activation VRAM Reduction Engine
+### 2. Paged KV-Cache & Memory Reduction Engine
 - Combines virtual memory **Paged KV-Cache** block tables, **INT4 / FP8 block quantization**, **Grouped-Query Attention (GQA)**, and **Multi-Head Latent Attention (MLA)** cache compression.
-- Eliminates memory fragmentation and cuts activation/KV-cache memory consumption by **$\ge 66.7\%$** across standard sequence lengths, empirically verified in `benchmarks/profile_vram.py`.
+- Designed to significantly reduce KV-cache fragmentation. Actual VRAM reduction percentages depend on model architecture, GQA ratio, and hardware — **no GPU-measured numbers are available yet** in this CPU-only CI environment. The `benchmarks/profile_vram.py` script measures Python heap (CPU) allocations only.
 
 ### 3. Enterprise Distributed Scaling (ZeRO-3 FSDP + CPU/NVMe Offload)
 - **Fully Sharded Data Parallelism (ZeRO-3 / FSDP)**: Model parameters, optimizer states, and gradients are sharded across participating ranks with NCCL / Ring-AllReduce communication.
@@ -56,7 +56,7 @@ Complete hardware-accelerated kernels implemented in both native CUDA (`src/cuda
 ### 4. Natural-Language Autonomous Training Orchestrator (`velograd.instruct`)
 Direct execution from natural-language instructions in Python or via the command line:
 ```bash
-velograd run "Train a Llama model for 5 epochs with ZeRO-3 offload and 66.7% KV compression"
+velograd run "Train a Llama model for 5 epochs with ZeRO-3 offload"
 ```
 The autonomous orchestrator inspects hardware topology (GPU count, VRAM, CPU cores), parses hyperparameters, synthesizes or binds dataset pipelines, shards model layers, and executes end-to-end training loops.
 
@@ -157,23 +157,35 @@ print(f"Autonomous training finished. Final Loss: {result['final_loss']:.4f}")
 
 ---
 
+## Implementation Status
+
+| Feature | Status |
+| :--- | :--- |
+| Python tensor engine + N-dim autograd | ✅ CPU-verified, CI-tested |
+| Fused SIMD kernels (Python/NumPy) | ✅ CPU-verified, CI-tested |
+| `velograd.nn` module hierarchy (Linear, LayerNorm, etc.) | ✅ CPU-verified |
+| `velograd.optim` (AdamW, SGD, Adam) | ✅ CPU-verified |
+| `velograd.distributed.FSDP` (ZeRO-3 simulation) | ✅ CPU-verified |
+| `velograd.instruct` NL training orchestrator | ✅ CPU-verified |
+| `velograd.compile` graph compiler | ✅ CPU-verified |
+| PagedAttention engine (`velograd.paged_attn`) | ✅ CPU-verified (simulation) |
+| Model family registry (Llama / Qwen / DeepSeek / Gemma / etc.) | ✅ CPU-verified |
+| CUDA kernels (`src/cuda/fused_kernels.cu`) | ⚠️ Written — NOT tested on GPU hardware |
+| Rust bindings (`src/`) | ⚠️ Written — NOT tested (requires Rust toolchain) |
+| Multi-node NCCL communication | ⚠️ Unverified — requires physical multi-GPU cluster |
+| GPU VRAM profiling / KV-cache reduction % | ⚠️ Unverified — requires physical NVIDIA GPU + pynvml |
+
+> [!NOTE]
+> VRAM reduction claims require physical GPU hardware to measure. No GPU-side benchmarks have been executed. `benchmarks/profile_vram.py` measures Python heap (CPU) allocations only via `tracemalloc`.
+
 ## Empirical Verification Benchmarks
 
-### 1. KV-Cache & Activation VRAM Profiler (`benchmarks/profile_vram.py`)
-Tested across 4,096-token and 32,768-token sequence context lengths:
-
-| Model Family | Sequence Length | Dense FP16 Footprint | VeloGrad Paged INT4/GQA | VRAM Reduction |
-| :--- | :--- | :--- | :--- | :--- |
-| **Llama-3.2-1B** | 4,096 | 1,177.6 MB | **86.6 MB** | **92.6%** |
-| **Llama-3-8B** | 4,096 | 2,355.2 MB | **173.2 MB** | **92.6%** |
-| **Qwen-2.5-7B** | 4,096 | 2,060.8 MB | **151.6 MB** | **92.6%** |
-| **DeepSeek-R1-7B** | 4,096 | 2,060.8 MB | **151.6 MB** | **92.6%** |
-| **Gemma-2-9B** | 4,096 | 2,060.8 MB | **151.6 MB** | **92.6%** |
-| **Mistral-7B** | 4,096 | 2,355.2 MB | **173.2 MB** | **92.6%** |
-| **Phi-4 (14B)** | 4,096 | 2,944.0 MB | **216.5 MB** | **92.6%** |
-| **Llama-3-8B (32K Context)** | 32,768 | 18,841.6 MB | **1,385.9 MB** | **92.6%** |
-
-*Verified: Empirical KV-Cache & Activation VRAM Reduction $\ge 66.7\%$ across all evaluated configurations.*
+### 1. CPU Heap Memory Profiler (`benchmarks/profile_vram.py`)
+Measures real Python heap allocations via `tracemalloc` for Tensor allocation and forward/backward passes on CPU. Run with:
+```bash
+python benchmarks/profile_vram.py
+```
+Output is real `tracemalloc` peak measurements in MB. GPU VRAM profiling requires physical NVIDIA hardware and is not available in the current CPU-only CI environment.
 
 ### 2. Compute Kernel Benchmarks (`benchmarks/bench_vs_pytorch.py`)
 - **GEMM Throughput**: Vectorized SIMD matrix multiplication running in milliseconds with autograd graph tracking.
@@ -187,7 +199,7 @@ Tested across 4,096-token and 32,768-token sequence context lengths:
 
 To execute the test suites covering all architectural layers:
 ```bash
-# Zero-Defect Comprehensive Beta Verification Suite (All 6 Phases)
+# Comprehensive Beta Verification Suite (All 6 Phases)
 python tests/test_exhaustive.py
 
 # Universal Ecosystem Interoperability Suite

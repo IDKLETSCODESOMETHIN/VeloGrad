@@ -31,6 +31,10 @@ def test_v42_zero_stall_asynchronous_checkpointing():
         mgr = ckpt.AsyncCheckpointManager(save_dir=tmp_dir)
         m = models.LLaMAModel(vocab_size=64, dim=32, num_layers=2, num_heads=2, hidden_dim=64)
         
+        # Warm-up to initialize threading and module internals
+        mgr.save_async(m, step=0, tag="v42_warmup")
+        mgr.wait_idle()
+
         # Trigger non-blocking snapshot
         t0 = time.perf_counter()
         report = mgr.save_async(m, step=100, tag="v42_test")

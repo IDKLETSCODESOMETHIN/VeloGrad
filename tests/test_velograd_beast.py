@@ -15,6 +15,7 @@ import velograd.nn as nn
 import velograd.functional as F
 from velograd.autograd import gradcheck
 import velograd.backend as backend
+import velograd.models as models
 
 def test_hardware_backend():
     print("[BEAST TEST 1/6] Live Hardware Detection & Driver Diagnostics...")

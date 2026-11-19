@@ -1,125 +1,155 @@
 """
 ================================================================================
 PROJECT: VeloGrad Engine Core (Bare-Metal Neural Compute Framework)
-BENCHMARK: VRAM Footprint & KV-Cache / Activation Reduction Profiler
-COPYRIGHT (C) 2026 VeloGrad Architecture & Systems Core Team
+BENCHMARK: Python Heap Memory Profiler (CPU / No-GPU)
+COPYRIGHT (C) 2026 Ayushman Singh Rathore
 ================================================================================
-Empirical profiling of Peak KV-Cache and Activation VRAM consumption:
-Compares uncompressed FP16/BF16 baselines against VeloGrad Paged INT4/FP8
-Cache with GQA/MLA Latent Compression and Activation Checkpointing.
-Target Empirical VRAM Reduction: ~66.7%
+
+Measures REAL Python heap allocations using tracemalloc.
+Reports peak memory in MB for Tensor allocation and forward-pass operations.
+
+NOTE: This benchmark runs on CPU only. It measures Python-side heap allocations,
+NOT VRAM. GPU VRAM profiling requires physical NVIDIA hardware with pynvml or
+torch.cuda.memory_stats(), which are unavailable in this environment.
+
+All numbers below are real measurements from tracemalloc — no formulas, no
+hardcoded values, no assertions on specific percentages.
 """
 
 import sys
 import os
-import math
+import tracemalloc
 import time
 
-# Ensure velograd is in path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "python")))
 
 import velograd as vg
-from velograd.paged_attn import PagedAttentionEngine, PagedKVCache
-from velograd.models.families import MODEL_REGISTRY, get_family_spec
+from velograd.tensor import Tensor, randn, zeros
+import velograd.nn as nn
+import velograd.optim as optim
 
-def compute_kv_cache_footprint(
-    seq_len: int,
-    num_layers: int,
-    num_heads: int,
-    head_dim: int,
-    num_kv_heads: int,
-    dtype_bytes: float = 2.0,  # 2.0 for FP16/BF16, 0.5 for INT4
-    batch_size: int = 1,
-    paged_fragmentation_overhead: float = 0.02
-) -> float:
-    """
-    Computes exact KV-cache VRAM consumption in Megabytes (MB).
-    KV = 2 * batch_size * seq_len * num_layers * num_kv_heads * head_dim * dtype_bytes
-    """
-    total_elements = 2 * batch_size * seq_len * num_layers * num_kv_heads * head_dim
-    bytes_consumed = total_elements * dtype_bytes * (1.0 + paged_fragmentation_overhead)
-    return bytes_consumed / (1024 * 1024)
 
-def profile_model_family(family_name: str, seq_len: int = 4096, batch_size: int = 1):
-    spec = get_family_spec(family_name)
-    num_layers = spec.get("layers", 32)
-    dim = spec.get("dim", 4096)
-    num_heads = spec.get("num_heads", 32)
-    head_dim = dim // num_heads
-    num_kv_heads = spec.get("num_kv_heads", num_heads // 4 if num_heads >= 4 else 1)
+def measure_alloc(label: str, fn):
+    """Run fn() under tracemalloc and return (result, peak_mb)."""
+    tracemalloc.start()
+    t0 = time.perf_counter()
+    result = fn()
+    elapsed = time.perf_counter() - t0
+    _current, peak = tracemalloc.get_traced_memory()
+    tracemalloc.stop()
+    peak_mb = peak / (1024 * 1024)
+    print(f"  {label:<45} peak={peak_mb:>8.3f} MB   time={elapsed*1000:>8.2f} ms")
+    return result, peak_mb
 
-    # Baseline: Uncompressed FP16 full MHA (or standard dense KV allocation)
-    baseline_mb = compute_kv_cache_footprint(
-        seq_len=seq_len,
-        num_layers=num_layers,
-        num_heads=num_heads,
-        head_dim=head_dim,
-        num_kv_heads=num_heads,
-        dtype_bytes=2.0,  # 16-bit
-        batch_size=batch_size,
-        paged_fragmentation_overhead=0.15  # standard dynamic allocation fragmentation
-    )
-
-    # VeloGrad Compressed Paged KV-Cache:
-    # 1. Block-quantized INT4 / FP8 storage with GQA/MLA sharing
-    # 2. Zero-waste paged block table allocation
-    velograd_paged_mb = compute_kv_cache_footprint(
-        seq_len=seq_len,
-        num_layers=num_layers,
-        num_heads=num_heads,
-        head_dim=head_dim,
-        num_kv_heads=num_kv_heads,
-        dtype_bytes=0.67,  # Effective bytes per entry with block scaling + latent packing
-        batch_size=batch_size,
-        paged_fragmentation_overhead=0.01  # VeloGrad paged block arena (1% waste)
-    )
-
-    savings_pct = (1.0 - (velograd_paged_mb / baseline_mb)) * 100.0
-    return {
-        "family": family_name,
-        "spec": spec,
-        "seq_len": seq_len,
-        "batch_size": batch_size,
-        "baseline_mb": baseline_mb,
-        "velograd_mb": velograd_paged_mb,
-        "savings_pct": savings_pct,
-    }
 
 def main():
     print("=" * 80)
-    print("      VELOGRAD EMPIRICAL KV-CACHE & ACTIVATION VRAM PROFILER")
-    print("      Measuring Empirical ~66.7% VRAM Reduction vs Dense FP16 Baselines")
+    print("      VELOGRAD CPU HEAP MEMORY PROFILER (tracemalloc — real measurements)")
     print("=" * 80)
+    print(f"  velograd version: {vg.__version__}")
+    print(f"  Environment:      CPU-only (no CUDA hardware present)")
+    print()
 
-    test_models = [
-        "llama-3.2-1b",
-        "llama-3-8b",
-        "qwen-2.5-7b",
-        "deepseek-r1-7b",
-        "gemma-2-9b",
-        "mistral-7b",
-        "phi-4"
-    ]
+    results = {}
 
-    print(f"\n{'Model Family':<18} | {'SeqLen':<7} | {'Dense FP16 (MB)':<16} | {'VeloGrad Paged (MB)':<19} | {'VRAM Reduction':<14}")
-    print("-" * 84)
+    # --- Tensor Allocation ---
+    print("[ Tensor Allocation ]")
 
-    total_savings = 0.0
-    for name in test_models:
-        res = profile_model_family(name, seq_len=4096, batch_size=1)
-        savings = res["savings_pct"]
-        total_savings += savings
-        print(f"{res['family']:<18} | {res['seq_len']:<7} | {res['baseline_mb']:>14.2f} MB | {res['velograd_mb']:>17.2f} MB | {savings:>12.1f}%")
+    _, mb = measure_alloc("randn(1, 512)  — small tensor",
+                          lambda: randn(1, 512))
+    results["randn_small"] = mb
 
-    # Long context evaluation (32K tokens)
-    long_res = profile_model_family("llama-3-8b", seq_len=32768, batch_size=1)
-    print(f"{long_res['family'] + ' (32k)':<18} | {long_res['seq_len']:<7} | {long_res['baseline_mb']:>14.2f} MB | {long_res['velograd_mb']:>17.2f} MB | {long_res['savings_pct']:>12.1f}%")
-    print("-" * 84)
+    _, mb = measure_alloc("randn(16, 2048) — medium tensor",
+                          lambda: randn(16, 2048))
+    results["randn_medium"] = mb
 
-    avg_savings = (total_savings + long_res["savings_pct"]) / (len(test_models) + 1)
-    print(f"\n[VeloGrad VRAM Profiler Verification]: Average KV/Activation Reduction: {avg_savings:.2f}%")
-    assert avg_savings >= 65.0, f"Expected ~66.7% reduction, got {avg_savings:.2f}%"
-    print(">>> ZERO-DEFECT PASS: Empirical KV-Cache & Activation VRAM Reduction >= 66.7% confirmed.")
+    _, mb = measure_alloc("randn(64, 4096) — large tensor",
+                          lambda: randn(64, 4096))
+    results["randn_large"] = mb
+
+    # --- Linear Layer Forward + Backward ---
+    print()
+    print("[ Linear Layer Forward + Backward ]")
+
+    def linear_fwd_bwd():
+        model = nn.Linear(128, 64)
+        x = randn(8, 128, requires_grad=True)
+        out = model(x)
+        loss = out.sum()
+        loss.backward()
+        return loss
+
+    _, mb = measure_alloc("Linear(128, 64) fwd+bwd  bs=8", linear_fwd_bwd)
+    results["linear_fwd_bwd"] = mb
+
+    def linear_large_fwd_bwd():
+        model = nn.Linear(512, 256)
+        x = randn(16, 512, requires_grad=True)
+        out = model(x)
+        loss = out.sum()
+        loss.backward()
+        return loss
+
+    _, mb = measure_alloc("Linear(512, 256) fwd+bwd bs=16", linear_large_fwd_bwd)
+    results["linear_large"] = mb
+
+    # --- MLP Forward + Backward ---
+    print()
+    print("[ MLP Forward + Backward ]")
+
+    def mlp_fwd_bwd():
+        class MLP(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.fc1 = nn.Linear(64, 128)
+                self.fc2 = nn.Linear(128, 64)
+                self._submodules.extend([self.fc1, self.fc2])
+            def forward(self, x):
+                import velograd.functional as F
+                return self.fc2(F.relu(self.fc1(x)))
+
+        model = MLP()
+        x = randn(4, 64, requires_grad=True)
+        out = model(x)
+        loss = out.sum()
+        loss.backward()
+        return loss
+
+    _, mb = measure_alloc("MLP(64→128→64) fwd+bwd bs=4", mlp_fwd_bwd)
+    results["mlp"] = mb
+
+    # --- AdamW Optimizer Step ---
+    print()
+    print("[ AdamW Optimizer Step ]")
+
+    def adamw_step():
+        model = nn.Linear(64, 32)
+        opt = optim.AdamW(model.parameters(), lr=1e-3)
+        x = randn(4, 64, requires_grad=True)
+        for _ in range(3):
+            opt.zero_grad()
+            out = model(x)
+            loss = out.sum()
+            loss.backward()
+            opt.step()
+        return loss
+
+    _, mb = measure_alloc("AdamW 3-step loop on Linear(64,32)", adamw_step)
+    results["adamw"] = mb
+
+    # --- Summary ---
+    print()
+    print("=" * 80)
+    print("  SUMMARY (real tracemalloc peak allocations)")
+    print("=" * 80)
+    for k, v in results.items():
+        print(f"  {k:<40}  {v:>8.3f} MB")
+
+    print()
+    print("NOTE: These are Python heap measurements. GPU VRAM profiling requires")
+    print("      physical NVIDIA hardware (pynvml / torch.cuda) — not available here.")
+    print("      Do NOT interpret these numbers as GPU VRAM consumption.")
+
 
 if __name__ == "__main__":
     main()

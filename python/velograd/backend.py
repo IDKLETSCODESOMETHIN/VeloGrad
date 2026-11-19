@@ -14,7 +14,7 @@ initializes unified virtual memory pointers, and dispatches compiled hardware ke
 import sys
 import os
 import ctypes
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 
 class DeviceType:
     CPU = "cpu"
