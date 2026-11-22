@@ -193,43 +193,50 @@ def main():
     print("      VELOGRAD vs PYTORCH COMPUTE ENGINE BENCHMARK SUITE")
     print("      Evaluating Fused Compute Kernels & Step Latencies")
     print("=" * 80)
-    print(f"  VeloGrad Version: {vg.__version__}")
+    print(f"  VeloGrad Version : {vg.__version__}")
     if HAS_TORCH:
-        print(f"  PyTorch Version : {TORCH_VERSION} (Live Head-to-Head Active)")
+        print(f"  PyTorch Version  : {TORCH_VERSION}")
+        torch_device = "CUDA (GPU)" if torch.cuda.is_available() else "CPU"
+        print(f"  PyTorch Backend  : {torch_device}")
     else:
-        print("  PyTorch Version : Not installed (Running standalone VeloGrad benchmarks)")
+        print("  PyTorch          : Not installed")
+    print("  VeloGrad Backend : Python/NumPy CPU  ← NOTE: GPU dispatch is v2 target")
     print("-" * 80)
 
-    print("\n[1/5] Benchmarking MatMul (GEMM 128x256x256):")
+    print("\n[1/5] MatMul GEMM (128×256×256):")
     gemm_ms, gflops, torch_gemm = benchmark_gemm(m=128, k=256, n=256)
-    print(f"      VeloGrad Latency : {gemm_ms:.2f} ms | Throughput: {gflops:.2f} GFLOPS")
+    print(f"      VeloGrad [CPU-Python] : {gemm_ms:.2f} ms | {gflops:.2f} GFLOPS")
     if torch_gemm:
-        print(f"      PyTorch Latency  : {torch_gemm:.2f} ms")
+        torch_device = "GPU" if HAS_TORCH and torch.cuda.is_available() else "CPU"
+        print(f"      PyTorch  [{torch_device}]       : {torch_gemm:.2f} ms")
 
-    print("\n[2/5] Benchmarking Fused RMSNorm + Residual Add (512x4096):")
+    print("\n[2/5] Fused RMSNorm + Residual Add (512×4096):")
     rmsnorm_ms, torch_rmsnorm = benchmark_rmsnorm(dim=4096, seq_len=512)
-    print(f"      VeloGrad Latency : {rmsnorm_ms:.2f} ms (fused single-pass)")
+    print(f"      VeloGrad [CPU-NumPy]  : {rmsnorm_ms:.2f} ms (algorithmic fusion, no SIMD dispatch yet)")
     if torch_rmsnorm:
-        print(f"      PyTorch Latency  : {torch_rmsnorm:.2f} ms (unfused RMSNorm)")
+        torch_device = "GPU" if HAS_TORCH and torch.cuda.is_available() else "CPU"
+        print(f"      PyTorch  [{torch_device}]       : {torch_rmsnorm:.2f} ms")
 
-    print("\n[3/5] Benchmarking Fused Rotary Position Embeddings (RoPE):")
+    print("\n[3/5] Fused Rotary Position Embeddings / RoPE (512-token):")
     rope_ms = benchmark_rope(seq_len=512, num_heads=16, head_dim=64)
-    print(f"      VeloGrad Latency : {rope_ms:.2f} ms (512-token in-place rotation)")
+    print(f"      VeloGrad [CPU-NumPy]  : {rope_ms:.2f} ms (in-place vectorised rotation)")
 
-    print("\n[4/5] Benchmarking Streaming Single-Pass Cross-Entropy (32x4096):")
+    print("\n[4/5] Streaming Cross-Entropy (32×4096 — zero logit materialisation):")
     ce_ms, torch_ce = benchmark_streaming_cross_entropy(batch=32, vocab=4096)
-    print(f"      VeloGrad Latency : {ce_ms:.2f} ms (zero logit tensor materialization)")
+    print(f"      VeloGrad [CPU-NumPy]  : {ce_ms:.2f} ms")
     if torch_ce:
-        print(f"      PyTorch Latency  : {torch_ce:.2f} ms")
+        torch_device = "GPU" if HAS_TORCH and torch.cuda.is_available() else "CPU"
+        print(f"      PyTorch  [{torch_device}]       : {torch_ce:.2f} ms")
 
-    print("\n[5/5] Benchmarking End-to-End Training Step (Fwd + Bwd + AdamW):")
+    print("\n[5/5] End-to-End Training Step (Fwd + Bwd + AdamW):")
     step_ms, tok_s, torch_step = benchmark_end_to_end_step(dim=128, seq_len=64)
-    print(f"      VeloGrad Latency : {step_ms:.2f} ms | Throughput: {tok_s:.1f} tokens/sec")
+    print(f"      VeloGrad [CPU-Python] : {step_ms:.2f} ms | {tok_s:.1f} tokens/sec")
     if torch_step:
-        print(f"      PyTorch Latency  : {torch_step:.2f} ms")
+        torch_device = "GPU" if HAS_TORCH and torch.cuda.is_available() else "CPU"
+        print(f"      PyTorch  [{torch_device}]       : {torch_step:.2f} ms")
 
     print("\n" + "=" * 80)
-    print(">>> Benchmark execution completed successfully.")
+    print(">>> Benchmark complete. VeloGrad GPU dispatch targeted for v2.0.")
     print("=" * 80)
 
 if __name__ == "__main__":

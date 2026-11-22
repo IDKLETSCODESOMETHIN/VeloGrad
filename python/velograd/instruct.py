@@ -117,13 +117,23 @@ def instruct(prompt: str, dataset: Optional[Any] = None, **kwargs) -> Dict[str, 
     # Use lightweight scale_down for direct responsive execution
     model = build_model_from_family(family, vocab_size_override=64, scale_down=64)
 
-    # Wrap in FSDP if requested
-    if use_fsdp:
+    # Wrap in FSDP only when genuinely distributed (world_size > 1).
+    # On a single GPU or CPU (world_size == 1) FSDP wraps the module in a
+    # sharding stub whose parameter() view is a no-op identity — the optimizer
+    # receives zero-size shards and the weights never actually update.
+    # Bypassing FSDP on single-device runs restores correct gradient flow.
+    world_size = hw.get("world_size", 1)
+    if use_fsdp and world_size > 1:
         model = dist.FSDP(model, cpu_offload=True)
+        print(f"  [ZeRO-3] FSDP active across {world_size} devices.")
+    elif use_fsdp:
+        print(f"  [ZeRO-3] Single-device run detected — FSDP bypassed. Full-weight optimisation active.")
 
     # 4. Synthesize or Bind Dataset
-    dim = getattr(model, "dim", 32)
-    vocab = getattr(model, "vocab_size", 64)
+    # Read dim/vocab from base module (never from FSDP wrapper)
+    base_module = model.module if hasattr(model, "module") else model
+    dim = getattr(base_module, "dim", 32)
+    vocab = getattr(base_module, "vocab_size", 64)
     if dataset is None:
         num_samples = max(16, batch_size * 4)
         inputs = randn(num_samples, dim)
@@ -131,7 +141,9 @@ def instruct(prompt: str, dataset: Optional[Any] = None, **kwargs) -> Dict[str, 
         dataset = TensorDataset(inputs, targets)
 
     # 5. Execute Fused Training
-    optimizer = optim.AdamW(model.parameters() if hasattr(model, "parameters") else [], lr=lr)
+    # Always draw parameters from the base module so the optimizer sees real weights.
+    base_module = model.module if hasattr(model, "module") else model
+    optimizer = optim.AdamW(base_module.parameters() if hasattr(base_module, "parameters") else [], lr=lr)
     criterion = nn.CrossEntropyLoss()
 
     history = []
