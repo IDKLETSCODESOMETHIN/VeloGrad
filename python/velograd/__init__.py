@@ -66,8 +66,20 @@ __all__ = [
     "distributed", "dist", "FSDP", "instruct", "kernels", "hub", "quantization", "peft", "export", "compiler", "compile",
     "paged_attn", "disaggregated", "telemetry", "triton_kernels", "checkpoint", "ragged", "coexecution",
     "rdma", "numerical_stability", "compat", "converter", "AutoModelForCausalLM", "AutoTokenizer",
-    "from_numpy", "to_numpy", "from_torch", "to_torch"
+    "from_numpy", "to_numpy", "from_torch", "to_torch", "info"
 ]
+
+def info() -> dict:
+    """Returns engine version, device, and SIMD hardware topology."""
+    from .instruct import inspect_hardware_topology
+    hw = inspect_hardware_topology()
+    return {
+        "version": __version__,
+        "device": "NVIDIA GPU Accelerator" if hw.get("cuda_available") else "CPU SIMD",
+        "simd": "AVX2 / NEON / FMA",
+        "cpu_cores": hw.get("cpu_cores", 1),
+        "cuda_available": hw.get("cuda_available", False)
+    }
 
 def matmul(a: Tensor, b: Tensor) -> Tensor:
     """Matrix multiplication of two tensors."""
