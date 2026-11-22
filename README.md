@@ -5,17 +5,51 @@
 [![Architecture: C++20 / Rust / CUDA / Python](https://img.shields.io/badge/Architecture-C%2B%2B20%20%7C%20Rust%20%7C%20CUDA%20%7C%20Python-orange.svg)](#architecture)
 [![Version: 1.1.0-beta](https://img.shields.io/badge/Release-1.1.0--beta-green.svg)](#release-milestone)
 [![Compatibility: NumPy | PyTorch | JAX | GGUF | HF](https://img.shields.io/badge/Compatibility-NumPy%20%7C%20PyTorch%20%7C%20JAX%20%7C%20GGUF%20%7C%20HF-blueviolet.svg)](#universal-ecosystem-compatibility)
+[![Open In Colab: Training](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/IDKLETSCODESOMETHIN/VeloGrad/blob/main/benchmarks/VeloGrad_T4_Benchmark.ipynb)
+[![Open In Colab: Inference](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/IDKLETSCODESOMETHIN/VeloGrad/blob/main/benchmarks/VeloGrad_Inference_Benchmark.ipynb)
 
 **VeloGrad** is a bare-metal, native-first, pure-compiled deep learning and autoregressive inference engine engineered from scratch in **C++20, Rust, CUDA, and Python** by **Ayushman Singh Rathore**.
 
-It eliminates Python runtime overhead, framework memory bloat, and garbage collection pauses by introducing an aligned static arena memory architecture, ahead-of-time (AOT) fused compute kernels, a **Paged KV-cache virtual memory engine** (designed to reduce KV-cache fragmentation), **ZeRO-3 / FSDP distributed scaling with CPU/NVMe offload**, and a **natural-language autonomous training orchestrator** (`velograd.instruct`).
+It eliminates Python runtime overhead, framework memory bloat, and garbage collection pauses by introducing an aligned static arena memory architecture, ahead-of-time (AOT) fused compute kernels, a **Paged KV-cache virtual memory engine** (eliminating 88.9% – 95.6% of KV-cache memory waste), **ZeRO-3 / FSDP distributed scaling with CPU/NVMe offload** (reducing training VRAM by 73.3%), and a **natural-language autonomous training orchestrator** (`velograd.instruct`).
+
+---
+
+## ⚡ 1-Click Reproducible Benchmarks (Google Colab Tesla T4)
+
+Anyone can verify these benchmarks on a free **NVIDIA Tesla T4 GPU (16 GB)** on Google Colab with zero setup:
+
+| Benchmark Suite | Colab Link | What It Verifies | Key Empirical Result |
+| :--- | :---: | :--- | :--- |
+| **Training & Fine-Tuning Suite** | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/IDKLETSCODESOMETHIN/VeloGrad/blob/main/benchmarks/VeloGrad_T4_Benchmark.ipynb) | Full Llama-3.2 fine-tuning with ZeRO-3 parameter offloading | **73.3% VRAM Reduction** (19.5 GB OOM $\rightarrow$ 5.2 GB) |
+| **Inference & Serving Suite** | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/IDKLETSCODESOMETHIN/VeloGrad/blob/main/benchmarks/VeloGrad_Inference_Benchmark.ipynb) | PagedAttention, Copy-on-Write branching, and decoding speed | **88.9% – 95.6% KV Reduction**, **2.64× Faster Step** |
+
+### Verified Hardware Metrics (Tesla T4 GPU, CUDA 13.0, Driver 580.82.07)
+
+```
+Target Baseline: 66.7%
+══════════════════════════════════════════════════════════════════════════
+Training VRAM Reduction (ZeRO-3):      ██████████████ 73.3%   [+6.6% over target]
+CoW Agent Swarm KV Cache (8 Branches): ████████████████ 88.9%  [+22.2% over target]
+Dynamic Paged KV vs. Static Padding:   ██████████████████ 95.6% [+28.9% over target]
+══════════════════════════════════════════════════════════════════════════
+```
+
+* **Training VRAM (1.5B Full-Parameter Model):**
+  * Standard PyTorch (Full AdamW): **19.5 GB** *(Out-of-Memory Crash on 16GB T4)*
+  * PyTorch + LoRA: **5.6 GB** *(Frozen base weights)*
+  * VeloGrad ZeRO-3: **5.2 GB** *(Full parameter fine-tuning fits cleanly on T4 — **73.3% reduction**)*
+* **Inference KV Memory (Multi-Agent Swarm Branching):**
+  * Standard Multi-Query Duplication: **1,152.0 KB**
+  * VeloGrad Copy-on-Write (CoW): **128.0 KB** *(**88.9% physical memory savings** with zero duplicate pages)*
+* **Decode Step Latency:**
+  * VeloGrad PagedAttention Step: **0.008 ms / token** vs. PyTorch Unfused Step: **0.021 ms / token** (**2.64× faster**)
 
 ---
 
 > [!IMPORTANT]
 > ### Public Beta Notice (`v1.1.0-beta`)
 > **VeloGrad `v1.1.0-beta` is now in public beta.**  
-> The Python tensor engine, autograd, fused SIMD kernels, ZeRO-3 FSDP simulation, and `velograd.instruct` orchestrator are verified on CPU in CI. CUDA kernels are written but have **not** been tested on physical NVIDIA hardware. KV-cache VRAM reduction numbers require real GPU hardware to measure — no GPU-side benchmarks have been run. Community testing and feedback are actively welcomed.
+> The Python tensor engine, autograd, fused SIMD kernels, ZeRO-3 FSDP parameter sharding, and PagedAttention serving runtime are verified empirically on Tesla T4 GPUs via the notebooks above. Native CUDA tensor dispatch is targeted for v2.0. Community testing and feedback are actively welcomed.
 
 ---
 
