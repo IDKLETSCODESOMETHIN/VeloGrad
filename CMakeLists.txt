@@ -30,8 +30,8 @@ add_library(velograd SHARED ${VELOGRAD_SOURCES})
 
 set_target_properties(velograd PROPERTIES
     OUTPUT_NAME "velograd"
-    VERSION "5.0.0"
-    SOVERSION "5"
+    VERSION "1.1.0"
+    SOVERSION "1"
 )
 
-message(STATUS "VeloGrad v5.0 Enterprise Production Engine configured for C++20 / CUDA 9.0+ / 10.0+")
+message(STATUS "VeloGrad v1.1.0-beta Engine configured for C++20 / CUDA")

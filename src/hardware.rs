@@ -340,7 +340,7 @@ impl HardwareDevice {
                         for j in 0..BLOCK_TILE_DIM {
                             let global_col = k_offset + j;
                             if global_row < m && global_col < k {
-                                shared_a[i][j] = *a.add(global_row * k + global_col);
+                                shared_a[i][j] = unsafe { *a.add(global_row * k + global_col) };
                             }
                         }
                     }
@@ -350,7 +350,7 @@ impl HardwareDevice {
                         for j in 0..BLOCK_TILE_DIM {
                             let global_col = block_col + j;
                             if global_row < k && global_col < n {
-                                shared_b[i][j] = *b.add(global_row * n + global_col);
+                                shared_b[i][j] = unsafe { *b.add(global_row * n + global_col) };
                             }
                         }
                     }
@@ -376,7 +376,9 @@ impl HardwareDevice {
                         for j in 0..BLOCK_TILE_DIM {
                             let global_col = block_col + j;
                             if global_col < n {
-                                *c.add(global_row * n + global_col) = accum[i][j];
+                                unsafe {
+                                    *c.add(global_row * n + global_col) = accum[i][j];
+                                }
                             }
                         }
                     }
@@ -413,7 +415,7 @@ impl HardwareDevice {
                         for j in 0..BLOCK_TILE_DIM {
                             let global_col = k_offset + j;
                             if global_row < m && global_col < k {
-                                shared_a[i][j] = *a.add(global_row * k + global_col);
+                                shared_a[i][j] = unsafe { *a.add(global_row * k + global_col) };
                             }
                         }
                     }
@@ -423,7 +425,7 @@ impl HardwareDevice {
                         for j in 0..BLOCK_TILE_DIM {
                             let global_col = block_col + j;
                             if global_row < k && global_col < n {
-                                shared_b[i][j] = *b.add(global_row * n + global_col);
+                                shared_b[i][j] = unsafe { *b.add(global_row * n + global_col) };
                             }
                         }
                     }
@@ -446,10 +448,12 @@ impl HardwareDevice {
                         for j in 0..BLOCK_TILE_DIM {
                             let global_col = block_col + j;
                             if global_col < n {
-                                let b_val = *bias.add(global_col);
+                                let b_val = unsafe { *bias.add(global_col) };
                                 let total = accum[i][j] + b_val;
                                 let activated = if total > 0.0 { total } else { 0.0 };
-                                *c.add(global_row * n + global_col) = activated;
+                                unsafe {
+                                    *c.add(global_row * n + global_col) = activated;
+                                }
                             }
                         }
                     }

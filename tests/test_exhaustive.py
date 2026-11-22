@@ -170,7 +170,7 @@ class TestExhaustiveVeloGradBeta(unittest.TestCase):
 
     def test_05_autonomous_instruct(self):
         """Phase 4: Verify natural-language autonomous training orchestrator."""
-        directive = "Train a Llama model for 2 epochs on synthetic dataset with ZeRO-3 offload and 66.7% KV compression"
+        directive = "Train a Llama model for 2 epochs on synthetic dataset with ZeRO-3 offload and paged KV compression"
         result = instruct(directive)
         self.assertIn("final_loss", result)
         self.assertFalse(math.isnan(result["final_loss"]))

@@ -54,7 +54,7 @@ def instruct(prompt: str, dataset: Optional[Any] = None, **kwargs) -> Dict[str, 
     
     Examples:
       - velograd.instruct("Train a 4-layer Llama model on synthetic data with ZeRO-3 offloading")
-      - velograd.instruct("Fine-tune deepseek-r1-7b with 66.7% KV compression for 5 epochs")
+      - velograd.instruct("Fine-tune deepseek-r1-7b with paged KV compression for 5 epochs")
       - velograd.instruct("Train Qwen 2.5 on 2 GPUs at 0.001 learning rate")
     """
     p_lower = prompt.lower().strip()
@@ -107,10 +107,10 @@ def instruct(prompt: str, dataset: Optional[Any] = None, **kwargs) -> Dict[str, 
             pass
 
     use_fsdp = any(k in p_lower for k in ["zero", "fsdp", "offload", "sharding", "zero-3"])
-    kv_compression = any(k in p_lower for k in ["kv", "paged", "compression", "66.7%"])
+    kv_compression = any(k in p_lower for k in ["kv", "paged", "compression"])
 
     print(f"  Parsed Config:  Family: {family} | Epochs: {epochs} | Batch: {batch_size} | LR: {lr}")
-    print(f"  Features:       FSDP/ZeRO-3: {use_fsdp} | 66.7% KV Compression: {kv_compression}")
+    print(f"  Features:       FSDP/ZeRO-3: {use_fsdp} | Paged KV Compression: {kv_compression}")
     print("--------------------------------------------------------------------------------\n")
 
     # 3. Instantiate Architecture

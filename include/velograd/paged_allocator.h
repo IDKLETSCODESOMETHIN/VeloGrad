@@ -46,6 +46,68 @@ struct alignas(PAGE_ALIGNMENT) PhysicalPage {
     // Host pinned memory pointers for eviction
     float* host_pinned_k_ptr{nullptr};
     float* host_pinned_v_ptr{nullptr};
+
+    PhysicalPage() = default;
+
+    PhysicalPage(const PhysicalPage& other)
+        : physical_block_id(other.physical_block_id),
+          block_size(other.block_size),
+          head_dim(other.head_dim),
+          num_tokens(other.num_tokens),
+          ref_count(other.ref_count.load()),
+          is_evicted_to_host(other.is_evicted_to_host),
+          last_accessed_timestamp(other.last_accessed_timestamp),
+          dev_k_ptr(other.dev_k_ptr),
+          dev_v_ptr(other.dev_v_ptr),
+          host_pinned_k_ptr(other.host_pinned_k_ptr),
+          host_pinned_v_ptr(other.host_pinned_v_ptr) {}
+
+    PhysicalPage(PhysicalPage&& other) noexcept
+        : physical_block_id(other.physical_block_id),
+          block_size(other.block_size),
+          head_dim(other.head_dim),
+          num_tokens(other.num_tokens),
+          ref_count(other.ref_count.load()),
+          is_evicted_to_host(other.is_evicted_to_host),
+          last_accessed_timestamp(other.last_accessed_timestamp),
+          dev_k_ptr(other.dev_k_ptr),
+          dev_v_ptr(other.dev_v_ptr),
+          host_pinned_k_ptr(other.host_pinned_k_ptr),
+          host_pinned_v_ptr(other.host_pinned_v_ptr) {}
+
+    PhysicalPage& operator=(const PhysicalPage& other) {
+        if (this != &other) {
+            physical_block_id = other.physical_block_id;
+            block_size = other.block_size;
+            head_dim = other.head_dim;
+            num_tokens = other.num_tokens;
+            ref_count.store(other.ref_count.load());
+            is_evicted_to_host = other.is_evicted_to_host;
+            last_accessed_timestamp = other.last_accessed_timestamp;
+            dev_k_ptr = other.dev_k_ptr;
+            dev_v_ptr = other.dev_v_ptr;
+            host_pinned_k_ptr = other.host_pinned_k_ptr;
+            host_pinned_v_ptr = other.host_pinned_v_ptr;
+        }
+        return *this;
+    }
+
+    PhysicalPage& operator=(PhysicalPage&& other) noexcept {
+        if (this != &other) {
+            physical_block_id = other.physical_block_id;
+            block_size = other.block_size;
+            head_dim = other.head_dim;
+            num_tokens = other.num_tokens;
+            ref_count.store(other.ref_count.load());
+            is_evicted_to_host = other.is_evicted_to_host;
+            last_accessed_timestamp = other.last_accessed_timestamp;
+            dev_k_ptr = other.dev_k_ptr;
+            dev_v_ptr = other.dev_v_ptr;
+            host_pinned_k_ptr = other.host_pinned_k_ptr;
+            host_pinned_v_ptr = other.host_pinned_v_ptr;
+        }
+        return *this;
+    }
 };
 
 /// Radix Tree Node for Sub-Microsecond Prefix KV Reuse

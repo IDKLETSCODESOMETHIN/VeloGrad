@@ -151,7 +151,7 @@ fsdp_model.all_gather_parameters()
 ```python
 import velograd as vg
 
-result = vg.instruct("Train a Llama model for 2 epochs with ZeRO-3 offload and 66.7% KV compression")
+result = vg.instruct("Train a Llama model for 2 epochs with ZeRO-3 offload")
 print(f"Autonomous training finished. Final Loss: {result['final_loss']:.4f}")
 ```
 
